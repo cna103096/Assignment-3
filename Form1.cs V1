@@ -1,0 +1,498 @@
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.ComponentModel;
+using System.Data;
+using System.Drawing;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+using System.Windows.Forms;
+
+namespace Assignment_3
+{
+    public partial class Form1 : Form
+    {
+        //Files conataining players and guilds
+        public static string PLAYERS_FILE = "players.txt";
+        public static string GUILDS_FILE = "guilds.txt";
+        //Create Dictionary for Guilds
+        public static Dictionary<uint, Guild> dictGuilds = new Dictionary<uint, Guild>();
+        //Create Dictionary for Players
+        public static Dictionary<uint, Player> dictPlayers = new Dictionary<uint, Player>();
+        //Max player level
+        public static uint MAX_LEVEL = 60;
+        //Races
+        public enum Race { Orc, Troll, Tauren, Forsaken };
+        //Classes
+        public enum Class { Warrior, Mage, Druid, Priest, Warlock, Rogue, Paladin, Hunter, Shaman }
+        //Roles
+        public enum Role { Tank, Healer, Damage}
+        //Server types
+        public static string[] arrayType = { "Casual", "Questing", "Mythic+", "Raiding", "PVP" };
+        //Servers
+        //servers are added when file is read
+        public static List<string> listServers = new List<string>();
+
+        //Players, Guild, Read Players, Read Guilds
+        #region
+        /*Guild Class
+         * creates a guild object with an id and a name
+         * */
+        public class Guild : IComparable
+        {
+            //guild vars
+            private uint id;
+            private string name;
+            private string server;
+            private uint type;
+
+            //public properties
+            #region
+
+            //Free R/W
+            public uint Id
+            {
+                get { return id; }
+                set { id = value; }
+            }
+
+            //Free R/W
+            public string Name
+            {
+                get { return name; }
+                set { name = value; }
+            }
+
+            //Free R/W
+            public string Server
+            {
+                get { return server; }
+                set { server = value; }
+            }
+
+            //Free R/W
+            public uint Type
+            {
+                get { return type; }
+                private set
+                {
+                    if (value >= 0 || value <= arrayType.Length - 1)
+                        type = value;
+                    else
+                    {
+                        throw new ArgumentException("Not a valid guild type");
+                    }
+                }
+            }
+
+            #endregion
+
+            /*Default constructor 
+             * no arguments
+             * */
+            public Guild() : this(0, 0,"", "")
+            {
+
+            }
+
+            /*Default constructor 
+             * arguments for id, name, server, and optional type for when file is read
+             * */
+            public Guild(uint iId, uint iType, string iName, string iServer)
+            {
+                Id = iId;
+                Name = iName;
+                Server = iServer;
+                Type = iType;
+            }
+
+            /* To string
+             * Output the guild
+             * */
+            public override string ToString()
+            {
+                //Displays the guild id and name
+                //string output = String.Format("{0}-{1}", this.Name, this.Server);
+                string output = String.Format("{0, -22}{1, 10}", this.Name, "[" + this.Server + "]");
+                return output;
+            }
+
+            /*IComparable
+            * overrides comparable
+            * */
+            public int CompareTo(object alpha)
+            {
+                //Check for null values
+                if (alpha == null) return 1;
+
+                //typecast
+                Guild rightOp = alpha as Guild;
+
+                //Items are compared by name
+                if (rightOp != null)
+                    return Name.CompareTo(rightOp.Name);
+                else
+                    throw new ArgumentException("Guild CompareTo argument is not an item");
+            }
+        }
+
+        /* Read in Guilds
+         * takes the file to get data from
+         * put guilds from file into dictionary
+         * */
+        public static void ReadGuilds(string input)
+        {
+            //string to read lines into
+            string tempLine;
+            //try block to catch filenotfound
+            try
+            {
+                using (StreamReader inFile = new StreamReader(input))
+                {
+                    //priming the read
+                    tempLine = inFile.ReadLine();
+                    //while there is still data in the file
+                    while (tempLine != null)
+                    {
+                        //get each piece of the guild separated by tab into an array
+                        string[] inGuilds = tempLine.Split('\t', '-');
+                        //if the correct number of attributes are on the line, create a guild from line
+                        if (inGuilds.Length <= 5)
+                        {
+                            //Create the guild from the array
+                            Guild tempGuild = new Guild(Convert.ToUInt32(inGuilds[0]), Convert.ToUInt32(inGuilds[1]), inGuilds[2], inGuilds[3]);
+                            //add to dictionary of items
+                            dictGuilds.Add(tempGuild.Id, tempGuild);
+                            //If a new server is input, add it to the list of servers
+                            if (!listServers.Contains(inGuilds[3]))
+                            {
+                                listServers.Add(inGuilds[3]);
+                            }
+                        }//end of if length
+
+                        //read next line
+                        tempLine = inFile.ReadLine();
+                    }//end of while
+                }//end of using, items have been read in
+            }//end of try
+            catch (FileNotFoundException)
+            {
+                Console.WriteLine(input + "file does not exist");
+            }
+        }
+
+        /* Players class
+         * Player Object has an id, name, race, class, level, exp, guildID
+         * */
+        public class Player : IComparable
+        {
+            //attributes of player class
+            private uint id;
+            private string name;
+            private Race playerRace;
+            private Class playerClass;
+            private Role playerRole;
+            private uint level;
+            private uint exp;
+            private uint guildID;
+            //public properties
+            #region
+            //R only
+            public uint Id
+            {
+                get { return id; }
+                private set { id = value; }
+            }
+
+            //R only
+            public string Name
+            {
+                get { return name; }
+                private set { name = value; }
+            }
+
+            //R only, 4 possible races
+            public Race PlayerRace
+            {
+                get { return playerRace; }
+                private set
+                {
+                    if (value >= (Race)0 || value <= (Race)3)
+                        playerRace = value;
+                    else
+                    {
+                        throw new ArgumentException(value + " is not a valid race id");
+                    }
+                }
+            }
+
+            //R only, 9 possible classes
+            public Class PlayerClass
+            {
+                get { return playerClass; }
+                private set
+                {
+                    if (value >= (Class)0 || value <= (Class)8)
+                        playerClass = value;
+                    else
+                    {
+                        throw new ArgumentException(value + " is not a valid class id");
+                    }
+                }
+            }
+
+            //R only, 3 possible roles
+            public Role PlayerRole
+            {
+                get { return playerRole; }
+                private set
+                {
+                    if (value >= (Role)0 || value <= (Role)2)
+                        playerRole = value;
+                    else
+                    {
+                        throw new ArgumentException(value + " is not a valid role id");
+                    }
+                }
+            }
+
+            //Free R/W, [0, MAX_LEVEL]
+            public uint Level
+            {
+                get { return level; }
+                set
+                {
+                    if (value >= 0 || value <= MAX_LEVEL)
+                        level = value;
+                    else
+                    {
+                        throw new ArgumentException(value + " is not a valid level");
+                    }
+                }
+            }
+
+            //Normal R access, W acces increments exp and increases level appropriatly
+            public uint Exp
+            {
+                get { return exp; }
+                set
+                {
+                    exp = value;
+                }
+            }
+
+            //R/W access
+            public uint GuildID
+            {
+                get { return guildID; }
+                set { guildID = value; }
+            }
+
+            #endregion
+
+            /* Constructor
+             * Arguments are id, name, race, class, level, exp, and guildID
+             * */
+            public Player(uint iID, string iName, Race iPlayerRace, Class iPlayerClass, Role iPlayerRole, uint iLevel, uint iExp, uint iGuildID = 0)
+            {
+                Id = iID;
+                Name = iName;
+                PlayerRace = iPlayerRace;
+                PlayerClass = iPlayerClass;
+                PlayerRole = iPlayerRole;
+                Level = iLevel;
+                Exp = iExp;
+                GuildID = iGuildID;
+            }
+
+            /* Default constructor
+             * No arguments
+             * */
+            public Player() : this(0, "", 0, 0, 0, 0, 0)
+            {
+
+            }
+
+            /*To String
+             * outputs player name, race, class, level, and guild
+             * */
+            public override string ToString()
+            {
+                //Displays the player name, race, level, and guild
+                string raceString = "" + (Race)this.PlayerRace;
+                string levelString = "" + this.Level;
+                //if the player is in a guild it will say which guild, if not then nothing
+                string guildString = "";
+                if (dictGuilds.ContainsKey(this.guildID))
+                {
+                    guildString = "Guild: " + dictGuilds[this.guildID];
+                }
+
+                string output = String.Format("{0}{1}{2}{3}", this.Name.PadRight(20), raceString.PadRight(10), levelString.PadRight(10), guildString);
+
+                return output;
+            }
+
+            /*To String
+             * outputs player name, race, class, level, and guild
+             * */
+            public string ToOutPutString()
+            {
+                //Displays the player name, race, level, and guild
+                string raceString = "" + (Race)this.PlayerRace;
+                string levelString = "" + this.Level;
+                //if the player is in a guild it will say which guild, if not then nothing
+                string guildString = "";
+                if (dictGuilds.ContainsKey(this.guildID))
+                {
+                    guildString = "Guild: " + dictGuilds[this.guildID];
+                }
+
+                string output = String.Format("Name: {0}Race: {1} Level: {2}{3}", this.Name.PadRight(20), raceString.PadRight(10), levelString.PadRight(10), guildString);
+
+                return output;
+            }
+
+            /*IComparable
+             * overrides comparable
+             * */
+            public int CompareTo(object alpha)
+            {
+                //Check for null values
+                if (alpha == null) return 1;
+
+                //typecast
+                Player rightOp = alpha as Player;
+
+                //Players are compared by name
+                if (rightOp != null)
+                    return Name.CompareTo(rightOp.Name);
+                else
+                    throw new ArgumentException("Player CompareTo argument is not an Player");
+            }
+        }//end of player class
+
+        /* Read in Players
+        * takes the file the players are stored in
+        * puts the items into the dictionary
+        * */
+        public static void ReadPlayers(string input)
+        {
+            //string to read lines into
+            string tempLine;
+            //try block to catch filenotfound
+            try
+            {
+                using (StreamReader inFile = new StreamReader(input))
+                {
+                    //priming the read
+                    tempLine = inFile.ReadLine();
+
+                    //while there is still data in the file
+                    while (tempLine != null)
+                    {
+                        //get each piece of the player separated by tab into an array
+                        string[] inPlayers = tempLine.Split('\t');
+                        //if the correct number of attributes are on the line, create a player from line
+                        if (inPlayers.Length < 8)
+                        {
+                            //Create the player from the array, convert string to uints and other attributes when necessary
+                            Player tempPlayer = new Player(Convert.ToUInt32(inPlayers[0]), inPlayers[1], (Race)Convert.ToUInt32(inPlayers[2]), (Class)Convert.ToUInt32(inPlayers[3]), (Role)Convert.ToUInt32(inPlayers[4]), Convert.ToUInt32(inPlayers[5]), Convert.ToUInt32(inPlayers[6]), Convert.ToUInt32(inPlayers[7]));
+
+                            //add to dictionary of players
+                            dictPlayers.Add(tempPlayer.Id, tempPlayer);
+                        }//end of if length
+
+                        //read next line
+                        tempLine = inFile.ReadLine();
+                    }//end of while
+                }//end of using, items have been read in
+            }//end of try
+            catch (FileNotFoundException)
+            {
+                Console.WriteLine(input + "file does not exist");
+            }
+        }//readPlayers
+
+#endregion//end of Guild, ReadGuilds, Player, ReadPlayers
+
+
+        public Form1()
+        {
+            InitializeComponent();
+            try
+            {
+                ReadPlayers(PLAYERS_FILE);
+                ReadGuilds(GUILDS_FILE);
+            }
+            catch (ArgumentException readException)
+            {
+                TextBox_Output.AppendText("error:" + readException);
+            }
+
+            //ComboBox_Guild_Server.DataSource = listServers;
+            //ComboBox_Player_Race.DataSource = Enum.GetValues(typeof(Race));
+            //fill comboboxes
+            ComboBox_Class_ClassType.DataSource = Enum.GetValues(typeof(Class));
+            ComboBox_Server_ClassType.DataSource = listServers;
+            //Create a new context so that it can be selected independlty of other comboboxes also  using listServers
+            ComboBox_Server_PercentRace.BindingContext = new BindingContext();
+            ComboBox_Server_PercentRace.DataSource = listServers;
+            ComboBox_Role_RoleTypes.DataSource = Enum.GetValues(typeof(Role));
+            //Create a new context so that it can be selected independlty of other comboboxes also  using listServers
+            ComboBox_Server_RoleTypes.BindingContext = new BindingContext();
+            ComboBox_Server_RoleTypes.DataSource = listServers;
+            ComboBox_GuildType.DataSource = arrayType;
+
+            //Set start value to be nothing
+            ComboBox_Class_ClassType.SelectedIndex = -1;
+            ComboBox_Server_ClassType.SelectedIndex = -1;
+            ComboBox_Server_PercentRace.SelectedIndex = -1;
+            ComboBox_Role_RoleTypes.SelectedIndex = -1;
+            ComboBox_Server_RoleTypes.SelectedIndex = -1;
+            ComboBox_GuildType.SelectedIndex = -1;
+            
+            
+
+        }
+
+        private void Min_Max_Changed(object sender, EventArgs e)
+        {
+            //If lower than 1, loop to max level
+            if(NumUpDown_Max_RoleTypes.Value < 1)
+            {
+                NumUpDown_Max_RoleTypes.Value = MAX_LEVEL;
+            }
+            if (NumUpDown_Min_RoleTypes.Value < 1)
+            {
+                NumUpDown_Min_RoleTypes.Value = MAX_LEVEL;
+            }
+
+            //If over max level, loop to 1
+            if (NumUpDown_Max_RoleTypes.Value > MAX_LEVEL)
+            {
+                NumUpDown_Max_RoleTypes.Value = 1;
+            }
+            if (NumUpDown_Min_RoleTypes.Value > MAX_LEVEL)
+            {
+                NumUpDown_Min_RoleTypes.Value = 1;
+            }
+
+
+            //Max cannot be greater than Min
+            if (NumUpDown_Min_RoleTypes.Value > NumUpDown_Max_RoleTypes.Value)
+            {
+                
+                if (NumUpDown_Max_RoleTypes == sender)
+                {
+                    NumUpDown_Min_RoleTypes.Value = NumUpDown_Max_RoleTypes.Value;
+                }
+                else
+                {
+                    NumUpDown_Max_RoleTypes.Value = NumUpDown_Min_RoleTypes.Value;
+                }
+            }
+        }
+    }
+}
